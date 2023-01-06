@@ -1,0 +1,20 @@
+#!/bin/sh -e
+
+# All available environment variables: https://gitlab.com/craftyguy/networkd-dispatcher
+
+# exit on ifname not start with 'ppp'
+# comment out fllow line if not needed.
+case $IFACE in ppp*) ;; *) exit 0 ;; esac
+
+DOMAIN=example.com
+RR=router
+export ACCESS_KEY_ID="<access key id>"
+export ACCESS_KEY_SECRET="<access key secret>"
+
+# update ipv4
+alidnsctl records set --domain ${DOMAIN} --type=A --rr=${RR} --value=${ADDR}
+
+# use first ipv6 addr
+IP6_ADDR=$(echo ${IP6_ADDRS} | awk '{print $1}')
+[ -z ${IP6_ADDR}] && exit 0
+alidnsctl records set --domain ${DOMAIN} --type=AAAA --rr=${RR} --value=${IP6_ADDR}

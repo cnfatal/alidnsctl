@@ -9,8 +9,8 @@ An exampl in ppp `/etc/ppp/ip-up.d/20-ddns.sh` script:
 ```sh
 #!/bin/sh -e
 
-export ACCESS_KEY_ID=<access key id>
-export ACCESS_KEY_SECRET=<access key id>
+export ACCESS_KEY_ID="<access key id>"
+export ACCESS_KEY_SECRET="<access key secret>"
 
 alidnsctl records set --domain example.com --type=A --rr=router --value=${IPLOCAL}
 ```

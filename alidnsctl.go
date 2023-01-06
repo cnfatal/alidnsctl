@@ -102,22 +102,25 @@ func (c *AliDNSCtl) GetRecord(ctx context.Context, id string) (*alidns.DescribeD
 }
 
 func (c *AliDNSCtl) SetRecord(ctx context.Context, domainName string, typ string, rr string, value string) (*alidns.AddDomainRecordResponseBody, error) {
-	// list and match
 	records, err := c.ListRecords(ctx, domainName, rr)
 	if err != nil {
 		return nil, err
 	}
 	for _, record := range records {
-		if record.RR != nil && *record.RR == rr {
-			// match and update
-			resp, err := c.UpdateRecord(ctx, *record.RecordId, typ, rr, value)
-			if err != nil {
-				return nil, err
-			}
-			return &alidns.AddDomainRecordResponseBody{RecordId: resp.RecordId, RequestId: resp.RequestId}, nil
+		if tea.StringValue(record.RR) != rr || tea.StringValue(record.Type) != typ {
+			continue
 		}
+		// already up to date
+		if tea.StringValue(record.Value) == value {
+			return &alidns.AddDomainRecordResponseBody{RecordId: record.RecordId}, nil
+		}
+		// update
+		resp, err := c.UpdateRecord(ctx, *record.RecordId, typ, rr, value)
+		if err != nil {
+			return nil, err
+		}
+		return &alidns.AddDomainRecordResponseBody{RecordId: resp.RecordId, RequestId: resp.RequestId}, nil
 	}
-	// create
 	return c.AddRecord(ctx, domainName, typ, rr, value)
 }
 
