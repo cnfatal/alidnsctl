@@ -9,6 +9,7 @@ import (
 
 var CompltionCommand = &cli.Command{
 	Name:      "completion",
+	Usage:     "generate shell completion script",
 	UsageText: CompletionUseage,
 	Subcommands: []*cli.Command{
 		{Name: "bash", Action: GenerateBashCompletion},

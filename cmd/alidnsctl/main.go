@@ -35,120 +35,146 @@ func NewAliDNSCtlCommand() *cli.App {
 		Suggest:              true,
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:     ArgsAccessKeyID,
-				Usage:    "accessKeyID for auth",
-				Required: true,
-				EnvVars:  []string{"ACCESS_KEY_ID"},
+				Name:    ArgsAccessKeyID,
+				Usage:   "accessKeyID for auth",
+				Value:   "",
+				EnvVars: []string{"ACCESS_KEY_ID"},
 			},
 			&cli.StringFlag{
-				Name:     ArgsAccessKeySecret,
-				Usage:    "accessKeySecret for auth",
-				Required: true,
-				EnvVars:  []string{"ACCESS_KEY_SECRET"},
+				Name:    ArgsAccessKeySecret,
+				Usage:   "accessKeySecret for auth",
+				Value:   "",
+				EnvVars: []string{"ACCESS_KEY_SECRET"},
 			},
 			&cli.StringFlag{
-				Name:    "output",
-				Usage:   "output format",
-				Aliases: []string{"o"},
+				Name:        "output",
+				Aliases:     []string{"o"},
+				Usage:       "output format",
+				DefaultText: "json",
 			},
 		},
 		Commands: []*cli.Command{
 			CompltionCommand,
 			{
-				Name: "domains",
+				Name:   "get",
+				Usage:  "query dns records",
+				Before: RequiredArgs,
+				UsageText: `
+# list all types of records
+alidnsctl get example.com
+
+# list all A records
+alidnsctl get --type A api.example.com
+
+# list all AAAA records
+alidnsctl get --type AAAA 6.example.com
+
+# list CNAME records
+alidnsctl get --type CNAME www.example.com`,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name: "type", Aliases: []string{"t"},
+					},
+				},
+				Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
+					fulldomain, typ := ctx.Args().First(), ctx.String("type")
+					return ctl.ListRecords(ctx.Context, fulldomain, typ)
+				}),
+			},
+			{
+				Name:    "set",
+				Usage:   "set dns records",
+				Aliases: []string{"apply"},
+				UsageText: `
+apply will set records to the values provided in args;
+the records not in the list will be removed.
+
+# apply two A records. (will remove records which value not in this args)
+alidnsctl set www.example.com 127.0.0.1 127.0.0.2
+
+# apply two AAAA records.
+alidnsctl set --type=AAAA www.example.com fe80::98c4:e4ff:fe94:cc67 fe80::98c4:e4ff:fe94:cc68
+
+alidnsctl set --type=CNAME www.example.com foo.com
+
+alidnsctl set --type=TXT example.com 5DBVzPVw9HPF`,
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "type", Aliases: []string{"t"}, Value: "A"},
+				},
+				Before: RequiredArgs,
+				Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
+					fulldomain, typ := ctx.Args().First(), ctx.String("type")
+					if ctx.Args().Len() > 1 {
+						values := ctx.Args().Slice()[1:]
+						if err := ctl.SetRecord(ctx.Context, fulldomain, typ, values); err != nil {
+							return nil, err
+						}
+					}
+					return ctl.ListRecords(ctx.Context, fulldomain, typ)
+				}),
+			},
+			{
+				Name:    "del",
+				Usage:   "remove dns records",
+				Aliases: []string{"remove"},
+				Flags: []cli.Flag{
+					&cli.BoolFlag{Name: "all"},
+					&cli.StringFlag{Name: "type", Aliases: []string{"t"}, Value: "A"},
+				},
+				UsageText: `
+# remove A records 127.0.0.1 127.0.0.2 from www.example.com
+alidnsctl del www.example.com 127.0.0.1 127.0.0.2
+
+# remove ipv6 records
+alidnsctl del --type AAAA www.example.com fe80::98c4:e4ff:fe94:cc67 fe80::98c4:e4ff:fe94:cc68
+
+# remove cname records
+alidnsctl del --type CNAME www.example.com foo.com
+
+# remove all A records on www.example.com if no type set.
+alidnsctl del --all www.example.com
+
+# remove all AAAA records on www.example.com.
+alidnsctl del --all --type AAAA www.example.com
+
+alidnsctl del --type=TXT example.com 5DBVzPVw9HPF`,
+				Before: RequiredArgs,
+				Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
+					fulldomain, typ := ctx.Args().First(), ctx.String("type")
+					if ctx.Bool("all") {
+						if _, err := ctl.DeleteRecordBatch(ctx.Context, fulldomain, typ); err != nil {
+							return nil, err
+						}
+					}
+					values := ctx.Args().Slice()[1:]
+					if err := ctl.DeleteRecordFromValues(ctx.Context, fulldomain, typ, values); err != nil {
+						return nil, err
+					}
+					return ctl.ListRecords(ctx.Context, fulldomain, typ)
+				}),
+			},
+			{
+				Name:  "domains",
+				Usage: "list available domains",
 				Subcommands: []*cli.Command{
 					{
-						Name: "list",
+						Name:  "list",
+						Usage: "list all domains",
 						Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
 							return ctl.ListDomains(ctx.Context)
 						}),
-					}, {
-						Name:      "get",
-						UsageText: `alidns domains get <domain>`,
-						Aliases:   []string{"info"},
+					},
+					{
+						Name:      "info",
+						UsageText: `alidnsctl domains info <domain>`,
 						Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
 							return ctl.GetDomain(ctx.Context, ctx.Args().First())
 						}),
 					},
 				},
 			},
-			{
-				Name: "records",
-				Subcommands: []*cli.Command{
-					{
-						Name: "list",
-						Flags: []cli.Flag{
-							&cli.StringFlag{Name: "domain", Required: true},
-						},
-						Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
-							return ctl.ListRecords(ctx.Context, ctx.String("domain"), "")
-						}),
-					},
-					{
-						Name:      "get",
-						Before:    RequiredArgs,
-						UsageText: `alidns records get <record id>`,
-						Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
-							return ctl.GetRecord(ctx.Context, ctx.Args().First())
-						}),
-					},
-					{
-						Name: "set",
-						UsageText: `
-alidns records set --domain example.com --type=A --rr=www --value=127.0.0.1
-alidns records set --domain example.com --type=TXT --rr=www --value=5DBVzPVw9HPF
-alidns records set --domain example.com --type=CNAME --rr=@ --value=www.example.com
-alidns records set --domain example.com --type=AAAA --rr=*.6 --value=fe80::98c4:e4ff:fe94:cc67
-`,
-						Flags: []cli.Flag{
-							&cli.StringFlag{Name: "domain", Required: true},
-							&cli.StringFlag{Name: "type", Required: true},
-							&cli.StringFlag{Name: "value", Required: true},
-							&cli.StringFlag{Name: "rr", Required: true},
-						},
-						Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
-							result, err := ctl.SetRecord(ctx.Context,
-								ctx.String("domain"),
-								ctx.String("type"),
-								ctx.String("rr"),
-								ctx.String("value"),
-							)
-							if err != nil {
-								return nil, err
-							}
-							return ctl.GetRecord(ctx.Context, *result.RecordId)
-						}),
-					},
-					{
-						Name:      "enable",
-						Before:    RequiredArgs,
-						UsageText: `alidns records enable <record id>`,
-						Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
-							return ctl.SetRecordStatus(ctx.Context, ctx.Args().First(), false)
-						}),
-					},
-					{
-						Name:      "disable",
-						Before:    RequiredArgs,
-						UsageText: `alidns records disable <record id>`,
-						Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
-							return ctl.SetRecordStatus(ctx.Context, ctx.Args().First(), true)
-						}),
-					},
-					{
-						Name:      "remove",
-						Aliases:   []string{"delete"},
-						UsageText: `alidns records remove <record id>`,
-						Before:    RequiredArgs,
-						Action: ctlfunc(func(ctx *cli.Context, ctl *alidnsctl.AliDNSCtl) (any, error) {
-							return ctl.DeleteRecord(ctx.Context, ctx.Args().First())
-						}),
-					},
-				},
-			},
 		},
 	}
-
 	return app
 }
 

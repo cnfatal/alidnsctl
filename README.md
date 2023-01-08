@@ -12,7 +12,7 @@ An exampl in ppp `/etc/ppp/ip-up.d/20-ddns.sh` script:
 export ACCESS_KEY_ID="<access key id>"
 export ACCESS_KEY_SECRET="<access key secret>"
 
-alidnsctl records set --domain example.com --type=A --rr=router --value=${IPLOCAL}
+alidnsctl set router.example.com ${IPLOCAL}
 ```
 
 ## Install
@@ -37,6 +37,48 @@ Set access key via enviroment:
 ```sh
 export ACCESS_KEY_ID=<access key id>
 export ACCESS_KEY_SECRET=<access key id>
+```
+
+Example update records:
+
+```sh
+alidnsctl set api.example.com 127.0.0.1
+alidnsctl set --type AAAA api.example.com fe80::b0bb:26ff:fe2b:cb20
+alidnsctl set --type CNAME @.example.com www.example.com
+alidnsctl set --type TXT txt.example.com hello_world hello_world2
+```
+
+For more infomations see help:
+
+```sh
+alidnsctl --help
+```
+
+List records:
+
+```sh
+$ alidnsctl list abc.example.com
+[
+  {
+    "DomainName": "example.com",
+    "Line": "default",
+    "Locked": false,
+    "RR": "abc",
+    "RecordId": "xxxxxxxxx",
+    "Status": "ENABLE",
+    "TTL": 600,
+    "Type": "CNAME",
+    "Value": "www.example.com",
+    "Weight": 1
+  }
+]
+```
+
+Remove Record:
+
+```sh
+$ alidnsctl del router.example.com 127.0.0.1 fe80::b0bb:26ff:fe2b:cb20
+[] #show left records on rr
 ```
 
 List Domains:
@@ -65,52 +107,4 @@ $ alidnsctl domains list
     "VersionName": "Alibaba Cloud DNS"
   }
 ]
-```
-
-List records:
-
-```sh
-$ alidnsctl records list --domain example.com
-[
-  {
-    "DomainName": "example.com",
-    "Line": "default",
-    "Locked": false,
-    "RR": "blog",
-    "RecordId": "xxxxxxxxx",
-    "Status": "ENABLE",
-    "TTL": 600,
-    "Type": "CNAME",
-    "Value": "www.example.com",
-    "Weight": 1
-  }
-]
-```
-
-Apply Record:
-
-```sh
-$ alidnsctl records set --domain example.com --type A --rr local --value 127.0.0.1
-{
-  "DomainName": "example.com",
-  "Line": "default",
-  "Locked": false,
-  "RR": "local",
-  "RecordId": "xxxxxx",
-  "RequestId": "xxxxxxxx-xxxx-xxxx-xxxx-1AAC99FBDC9E",
-  "Status": "ENABLE",
-  "TTL": 600,
-  "Type": "A",
-  "Value": "127.0.0.1"
-}
-```
-
-Remove Record:
-
-```sh
-$ alidnsctl records remove <RecordId>
-{
-  "RecordId": "<RecordId>",
-  "RequestId": "xxxxxxxx-3265-55D6-AFD7-1C082412AF3F"
-}
 ```
